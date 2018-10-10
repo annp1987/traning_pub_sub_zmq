@@ -1,0 +1,70 @@
+import multiprocessing
+from eventlet.green import zmq
+import time
+
+i = 1
+
+def bob_client():
+    print("STARTING BOB1")
+    CTX = zmq.Context()
+    bob = zmq.Socket(CTX, zmq.SUB)
+    bob.connect("ipc:///tmp/test")
+    bob.setsockopt(zmq.SUBSCRIBE, b'')
+
+    poller = zmq.Poller()
+    poller.register(bob, zmq.POLLIN)
+    while True:
+        evts = dict(poller.poll())
+        if evts[bob] == zmq.POLLIN:
+            a = bob.recv()
+            if len(a):
+                print("BOB1 GOT: ", bob.recv())
+        time.sleep(1)
+
+
+def bob2_client():
+    print("STARTING BOB2")
+    CTX = zmq.Context()
+    bob = zmq.Socket(CTX, zmq.SUB)
+    bob.connect("ipc:///tmp/test")
+    bob.setsockopt(zmq.SUBSCRIBE, b'')
+
+    poller = zmq.Poller()
+    poller.register(bob, zmq.POLLIN)
+    while True:
+        evts = dict(poller.poll())
+        if evts[bob] == zmq.POLLIN:
+            a = bob.recv()
+            if len(a):
+                print("BOB2 GOT: ", bob.recv())
+        time.sleep(1)
+
+def alice_server():
+    print("STARTING ALICE")
+    CTX = zmq.Context(1)
+    alice = zmq.Socket(CTX, zmq.PUB)
+    alice.bind("ipc:///tmp/test")
+    print("ALICE READY")
+    global i
+    while True:
+        i = i +1
+        msg = 'Hi Alice ' + str(i)
+        alice.send(msg.encode('utf-8'))
+        time.sleep(2)
+
+nflog_process = multiprocessing.Process(target=alice_server)
+nflog_process.daemon = True
+nflog_process.start()
+nflog_process = multiprocessing.Process(target=bob_client)
+nflog_process.daemon = True
+nflog_process.start()
+nflog_process = multiprocessing.Process(target=bob2_client)
+nflog_process.daemon = True
+nflog_process.start()
+# pool = eventlet.GreenPool()
+# pool.spawn(bob_client)
+# pool.spawn(bob2_client)
+# pool.waitall()
+
+while True:
+    time.sleep(1)
